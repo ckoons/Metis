@@ -1,0 +1,24 @@
+# Core requirements
+fastapi>=0.100.0
+uvicorn>=0.23.0
+websockets>=11.0.3
+pydantic>=2.1.1
+sse-starlette>=1.6.1
+
+# Data handling
+sqlalchemy>=2.0.0
+alembic>=1.11.0
+python-jose[cryptography]>=3.3.0  # For JWT
+python-multipart>=0.0.6  # For form data parsing
+
+# Utilities
+uuid>=1.30
+rich>=13.0.0
+python-dotenv>=1.0.0
+aiohttp>=3.8.5
+asyncio>=3.4.3
+jinja2>=3.1.2
+
+# Hermes integration
+# Note: Hermes is imported dynamically at runtime from the parent directory
+# No direct dependency here to avoid version conflicts
