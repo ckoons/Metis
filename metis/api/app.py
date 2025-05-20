@@ -20,6 +20,7 @@ from metis.config import config
 from metis.api.routes import router as api_router
 from metis.api.routes import task_manager  # Reuse the TaskManager instance from routes
 from metis.api.schemas import WebSocketMessage, WebSocketRegistration
+from metis.api.fastmcp_endpoints import mcp_router, fastmcp_server
 
 
 # Create FastAPI application
@@ -43,8 +44,9 @@ app.add_middleware(
 # Get port from environment variable or use default
 PORT = int(os.environ.get("METIS_PORT", 8011))
 
-# Include API router
+# Include API routers
 app.include_router(api_router)
+app.include_router(mcp_router)
 
 
 # Root endpoint
@@ -251,10 +253,17 @@ async def websocket_endpoint(websocket: WebSocket):
 async def startup_event():
     """Startup event handler for Metis API.
     
-    Registers the service with Hermes for service discovery.
+    Initializes FastMCP server and registers the service with Hermes for service discovery.
     """
     from metis.utils.hermes_helper import hermes_client
     import asyncio
+    
+    # Initialize FastMCP server
+    try:
+        await fastmcp_server.startup()
+        print("FastMCP server initialized successfully")
+    except Exception as e:
+        print(f"Warning: FastMCP server initialization failed: {e}")
     
     # Register with Hermes
     success = await hermes_client.register()
@@ -269,9 +278,16 @@ async def startup_event():
 async def shutdown_event():
     """Shutdown event handler for Metis API.
     
-    Unregisters the service from Hermes.
+    Shuts down FastMCP server and unregisters the service from Hermes.
     """
     from metis.utils.hermes_helper import hermes_client
+    
+    # Shutdown FastMCP server
+    try:
+        await fastmcp_server.shutdown()
+        print("FastMCP server shut down successfully")
+    except Exception as e:
+        print(f"Warning: FastMCP server shutdown failed: {e}")
     
     # Deregister from Hermes
     if hermes_client.registered:

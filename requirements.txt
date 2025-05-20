@@ -22,3 +22,6 @@ jinja2>=3.1.2
 # Hermes integration
 # Note: Hermes is imported dynamically at runtime from the parent directory
 # No direct dependency here to avoid version conflicts
+
+# Tekton core for MCP support
+tekton-core>=0.1.0
