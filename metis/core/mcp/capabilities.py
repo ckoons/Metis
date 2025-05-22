@@ -15,7 +15,9 @@ from tekton.mcp.fastmcp import mcp_capability
 )
 class TaskManagementCapability:
     """Capability for basic task CRUD operations."""
-    pass
+    name: str = "task_management"
+    description: str = "Core task management operations including creation, reading, updating, and deletion of tasks"
+    version: str = "1.0.0"
 
 
 # Dependency Management Capability - Task dependency and relationship management
@@ -25,7 +27,9 @@ class TaskManagementCapability:
 )
 class DependencyManagementCapability:
     """Capability for task dependency management."""
-    pass
+    name: str = "dependency_management"
+    description: str = "Task dependency management including creation and analysis of task relationships and dependencies"
+    version: str = "1.0.0"
 
 
 # Task Analytics Capability - Analysis and reporting on tasks
@@ -35,7 +39,9 @@ class DependencyManagementCapability:
 )
 class TaskAnalyticsCapability:
     """Capability for task analysis and reporting."""
-    pass
+    name: str = "task_analytics"
+    description: str = "Task analytics and reporting including complexity analysis, status tracking, and performance metrics"
+    version: str = "1.0.0"
 
 
 # Telos Integration Capability - Requirements integration
@@ -45,4 +51,6 @@ class TaskAnalyticsCapability:
 )
 class TelosIntegrationCapability:
     """Capability for Telos requirements integration."""
-    pass
+    name: str = "telos_integration"
+    description: str = "Integration with Telos requirements management system for importing and linking requirements to tasks"
+    version: str = "1.0.0"

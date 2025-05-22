@@ -49,10 +49,10 @@ fastmcp_server = FastMCPServer(
 )
 
 # Register capabilities and tools
-fastmcp_server.register_capability(TaskManagementCapability)
-fastmcp_server.register_capability(DependencyManagementCapability) 
-fastmcp_server.register_capability(TaskAnalyticsCapability)
-fastmcp_server.register_capability(TelosIntegrationCapability)
+fastmcp_server.register_capability(TaskManagementCapability())
+fastmcp_server.register_capability(DependencyManagementCapability()) 
+fastmcp_server.register_capability(TaskAnalyticsCapability())
+fastmcp_server.register_capability(TelosIntegrationCapability())
 
 # Register all tools
 for tool in task_management_tools + dependency_management_tools + analytics_tools + telos_integration_tools:
