@@ -6,7 +6,7 @@ These schemas are based on the core data models but adapted for API usage.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 
@@ -163,14 +163,16 @@ class TaskCreate(BaseModel):
     subtasks: List[SubtaskCreate] = []
     requirement_refs: List[RequirementRefCreate] = []
     
-    @validator("status")
+    @field_validator("status")
+    @classmethod
     def status_must_be_valid(cls, v):
         """Validate that the status is a valid TaskStatus value."""
         if v not in [s.value for s in TaskStatus]:
             raise ValueError(f"Invalid task status: {v}")
         return v
     
-    @validator("priority")
+    @field_validator("priority")
+    @classmethod
     def priority_must_be_valid(cls, v):
         """Validate that the priority is a valid Priority value."""
         if v not in [p.value for p in Priority]:
@@ -190,14 +192,16 @@ class TaskUpdate(BaseModel):
     assignee: Optional[str] = None
     due_date: Optional[datetime] = None
     
-    @validator("status")
+    @field_validator("status")
+    @classmethod
     def status_must_be_valid(cls, v):
         """Validate that the status is a valid TaskStatus value."""
         if v is not None and v not in [s.value for s in TaskStatus]:
             raise ValueError(f"Invalid task status: {v}")
         return v
     
-    @validator("priority")
+    @field_validator("priority")
+    @classmethod
     def priority_must_be_valid(cls, v):
         """Validate that the priority is a valid Priority value."""
         if v is not None and v not in [p.value for p in Priority]:

@@ -5,7 +5,7 @@ This module defines the core Task model for the Metis system.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from uuid import uuid4
 from typing import Optional, List, Dict, Any, Set
 
@@ -39,14 +39,16 @@ class Task(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     requirement_refs: List[RequirementRef] = []
     
-    @validator("status")
+    @field_validator("status")
+    @classmethod
     def status_must_be_valid(cls, v):
         """Validate that the status is a valid TaskStatus value."""
         if v not in [s.value for s in TaskStatus]:
             raise ValueError(f"Invalid task status: {v}")
         return v
     
-    @validator("priority")
+    @field_validator("priority")
+    @classmethod
     def priority_must_be_valid(cls, v):
         """Validate that the priority is a valid Priority value."""
         if v not in [p.value for p in Priority]:
