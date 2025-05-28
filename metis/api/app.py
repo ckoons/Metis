@@ -70,7 +70,8 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint following Tekton standards."""
-    from tekton.utils.port_config import get_metis_port
+    # from tekton.utils.port_config import get_metis_port
+    def get_metis_port(): return 8011
     port = get_metis_port()
     
     return {
@@ -273,7 +274,8 @@ async def startup_event():
         print(f"Warning: FastMCP server initialization failed: {e}")
     
     # Register with Hermes using standard utility
-    from tekton.utils.port_config import get_metis_port
+    # from tekton.utils.port_config import get_metis_port
+    def get_metis_port(): return 8011
     port = get_metis_port()
     
     hermes_registration = HermesRegistration()
