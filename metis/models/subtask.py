@@ -11,6 +11,7 @@ from uuid import uuid4
 from typing import Optional, List, Dict, Any
 
 from metis.models.enums import TaskStatus
+from metis.models.complexity import ComplexityScore
 
 
 class Subtask(BaseModel):
@@ -21,10 +22,13 @@ class Subtask(BaseModel):
     always associated with a parent task.
     """
     id: str = Field(default_factory=lambda: str(uuid4()))
+    parent_task_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     status: str = TaskStatus.PENDING.value
     order: int = 0  # Position within list of subtasks
+    estimated_hours: float = 1.0  # Estimated time to complete
+    complexity: Optional[ComplexityScore] = None  # Complexity analysis
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     

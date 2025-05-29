@@ -17,6 +17,7 @@ from metis.api.schemas import (
     SubtaskUpdate, RequirementRefCreate, RequirementRefUpdate,
     ApiResponse, WebSocketMessage, WebSocketRegistration
 )
+from metis.core.mcp.tools import decompose_task as mcp_decompose_task
 
 
 # Create router
@@ -388,6 +389,97 @@ async def import_requirement_as_task(
     return controller._task_to_response(task)
 
 
+# AI-powered endpoints
+
+@router.post(
+    "/tasks/{task_id}/decompose",
+    response_model=Dict[str, Any],
+    summary="Decompose task using AI",
+    description="Break down a task into subtasks using AI-powered decomposition",
+    tags=["AI Features"]
+)
+async def decompose_task(
+    task_id: str = Path(..., title="The ID of the task to decompose"),
+    depth: int = Query(2, title="Maximum decomposition depth", ge=1, le=5),
+    max_subtasks: int = Query(10, title="Maximum number of subtasks", ge=1, le=20),
+    auto_create: bool = Query(True, title="Automatically create subtasks"),
+    controller: TaskController = Depends(get_task_controller)
+):
+    """Decompose a task into subtasks using AI."""
+    result = await mcp_decompose_task(
+        task_id=task_id,
+        depth=depth,
+        max_subtasks=max_subtasks,
+        auto_create=auto_create
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Task decomposition failed")
+        )
+    
+    return result
+
+
+@router.post(
+    "/tasks/{task_id}/analyze-complexity",
+    response_model=Dict[str, Any],
+    summary="Analyze task complexity using AI",
+    description="Get AI-powered analysis of task complexity",
+    tags=["AI Features"]
+)
+async def analyze_task_complexity(
+    task_id: str = Path(..., title="The ID of the task to analyze"),
+    include_subtasks: bool = Query(True, title="Include subtasks in analysis"),
+    controller: TaskController = Depends(get_task_controller)
+):
+    """Analyze task complexity using AI."""
+    from metis.core.mcp.tools import analyze_task_complexity as mcp_analyze_complexity
+    
+    result = await mcp_analyze_complexity(
+        task_id=task_id,
+        include_subtasks=include_subtasks
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Complexity analysis failed")
+        )
+    
+    return result
+
+
+@router.post(
+    "/tasks/suggest-order",
+    response_model=Dict[str, Any],
+    summary="Suggest optimal task execution order",
+    description="Get AI-powered suggestions for task execution order",
+    tags=["AI Features"]
+)
+async def suggest_task_order(
+    task_ids: Optional[List[str]] = Body(None, title="List of task IDs to order"),
+    status_filter: Optional[str] = Query(None, title="Filter by status", enum=["pending", "in_progress", "completed", "blocked"]),
+    controller: TaskController = Depends(get_task_controller)
+):
+    """Suggest optimal task execution order using AI."""
+    from metis.core.mcp.tools import suggest_task_order as mcp_suggest_order
+    
+    result = await mcp_suggest_order(
+        task_ids=task_ids,
+        status_filter=status_filter
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Task ordering failed")
+        )
+    
+    return result
+
+
 @router.post(
     "/tasks/{task_id}/telos/requirements/{requirement_id}",
     response_model=TaskResponse,
@@ -418,3 +510,94 @@ async def add_telos_requirement_ref(
     from metis.api.controllers import TaskController
     controller = TaskController(task_manager)
     return controller._task_to_response(task)
+
+
+# AI-powered endpoints
+
+@router.post(
+    "/tasks/{task_id}/decompose",
+    response_model=Dict[str, Any],
+    summary="Decompose task using AI",
+    description="Break down a task into subtasks using AI-powered decomposition",
+    tags=["AI Features"]
+)
+async def decompose_task(
+    task_id: str = Path(..., title="The ID of the task to decompose"),
+    depth: int = Query(2, title="Maximum decomposition depth", ge=1, le=5),
+    max_subtasks: int = Query(10, title="Maximum number of subtasks", ge=1, le=20),
+    auto_create: bool = Query(True, title="Automatically create subtasks"),
+    controller: TaskController = Depends(get_task_controller)
+):
+    """Decompose a task into subtasks using AI."""
+    result = await mcp_decompose_task(
+        task_id=task_id,
+        depth=depth,
+        max_subtasks=max_subtasks,
+        auto_create=auto_create
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Task decomposition failed")
+        )
+    
+    return result
+
+
+@router.post(
+    "/tasks/{task_id}/analyze-complexity",
+    response_model=Dict[str, Any],
+    summary="Analyze task complexity using AI",
+    description="Get AI-powered analysis of task complexity",
+    tags=["AI Features"]
+)
+async def analyze_task_complexity(
+    task_id: str = Path(..., title="The ID of the task to analyze"),
+    include_subtasks: bool = Query(True, title="Include subtasks in analysis"),
+    controller: TaskController = Depends(get_task_controller)
+):
+    """Analyze task complexity using AI."""
+    from metis.core.mcp.tools import analyze_task_complexity as mcp_analyze_complexity
+    
+    result = await mcp_analyze_complexity(
+        task_id=task_id,
+        include_subtasks=include_subtasks
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Complexity analysis failed")
+        )
+    
+    return result
+
+
+@router.post(
+    "/tasks/suggest-order",
+    response_model=Dict[str, Any],
+    summary="Suggest optimal task execution order",
+    description="Get AI-powered suggestions for task execution order",
+    tags=["AI Features"]
+)
+async def suggest_task_order(
+    task_ids: Optional[List[str]] = Body(None, title="List of task IDs to order"),
+    status_filter: Optional[str] = Query(None, title="Filter by status", enum=["pending", "in_progress", "completed", "blocked"]),
+    controller: TaskController = Depends(get_task_controller)
+):
+    """Suggest optimal task execution order using AI."""
+    from metis.core.mcp.tools import suggest_task_order as mcp_suggest_order
+    
+    result = await mcp_suggest_order(
+        task_ids=task_ids,
+        status_filter=status_filter
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Task ordering failed")
+        )
+    
+    return result
