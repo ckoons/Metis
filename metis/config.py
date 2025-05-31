@@ -22,7 +22,7 @@ DEFAULT_CONFIG = {
     "PROMETHEUS_PORT": 8006,
     
     # Database configuration
-    "DB_URL": "sqlite:///metis.db",
+    "DB_URL": lambda: f"sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'metis.db'))}",
     
     # API configuration
     "API_PREFIX": "/api/v1",
