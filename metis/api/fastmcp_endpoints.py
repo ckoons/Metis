@@ -54,9 +54,19 @@ fastmcp_server.register_capability(DependencyManagementCapability())
 fastmcp_server.register_capability(TaskAnalyticsCapability())
 fastmcp_server.register_capability(TelosIntegrationCapability())
 
-# Register all tools
-for tool in task_management_tools + dependency_management_tools + analytics_tools + telos_integration_tools:
-    fastmcp_server.register_tool(tool)
+# Register all tools - convert to proper ToolSchema format
+for tool_dict in task_management_tools + dependency_management_tools + analytics_tools + telos_integration_tools:
+    # Convert the tool dict to match ToolSchema expectations
+    tool_schema = {
+        "name": tool_dict["name"],
+        "description": tool_dict["description"],
+        "schema": {  # This is the 'input_schema' field aliased as 'schema'
+            "type": "object",
+            "properties": tool_dict["parameters"]["properties"],
+            "required": tool_dict["parameters"].get("required", [])
+        }
+    }
+    fastmcp_server.register_tool(tool_schema)
 
 
 # Create router for MCP endpoints

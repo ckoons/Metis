@@ -6,7 +6,15 @@ environment variables, default settings, and component integration.
 """
 
 import os
+import sys
 from typing import Dict, Any
+
+# Add Tekton root to path for imports
+tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if tekton_root not in sys.path:
+    sys.path.append(tekton_root)
+
+from tekton.utils.port_config import get_metis_port, get_hermes_port, get_telos_port, get_prometheus_port
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -15,11 +23,11 @@ DEFAULT_CONFIG = {
     "SERVICE_DESCRIPTION": "Task Management System for Tekton",
     "SERVICE_VERSION": "0.1.0",
     
-    # Port configuration
-    "METIS_PORT": 8011,
-    "HERMES_PORT": 8001,
-    "TELOS_PORT": 8008,
-    "PROMETHEUS_PORT": 8006,
+    # Port configuration (dynamically loaded)
+    "METIS_PORT": None,
+    "HERMES_PORT": None,
+    "TELOS_PORT": None,
+    "PROMETHEUS_PORT": None,
     
     # Database configuration
     "DB_URL": lambda: f"sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'metis.db'))}",
@@ -44,9 +52,15 @@ def get_config() -> Dict[str, Any]:
     """
     config = DEFAULT_CONFIG.copy()
     
-    # Override with environment variables
+    # Get ports from centralized config
+    config["METIS_PORT"] = get_metis_port()
+    config["HERMES_PORT"] = get_hermes_port()
+    config["TELOS_PORT"] = get_telos_port()
+    config["PROMETHEUS_PORT"] = get_prometheus_port()
+    
+    # Override with environment variables (except ports which are centrally managed)
     for key in config.keys():
-        if key in os.environ:
+        if key in os.environ and not key.endswith("_PORT"):
             # Convert to appropriate type
             if isinstance(config[key], int):
                 config[key] = int(os.environ[key])

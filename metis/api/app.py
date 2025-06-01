@@ -17,9 +17,14 @@ from pydantic import BaseModel
 from typing import Dict, List, Set, Any, Optional
 from uuid import UUID
 
-# Import Hermes registration utility
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
-from hermes_registration import HermesRegistration, heartbeat_loop
+# Add Tekton root to path if not already present
+tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if tekton_root not in sys.path:
+    sys.path.insert(0, tekton_root)
+
+# Import Hermes registration utility with correct path
+from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
+from tekton.utils.port_config import get_metis_port
 
 from metis.config import config
 from metis.api.routes import router as api_router
@@ -70,8 +75,6 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint following Tekton standards."""
-    # from tekton.utils.port_config import get_metis_port
-    def get_metis_port(): return 8011
     port = get_metis_port()
     
     return {
@@ -274,8 +277,6 @@ async def startup_event():
         print(f"Warning: FastMCP server initialization failed: {e}")
     
     # Register with Hermes using standard utility
-    # from tekton.utils.port_config import get_metis_port
-    def get_metis_port(): return 8011
     port = get_metis_port()
     
     hermes_registration = HermesRegistration()
