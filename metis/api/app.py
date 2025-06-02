@@ -10,6 +10,7 @@ import os
 import sys
 import json
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -22,15 +23,90 @@ tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'
 if tekton_root not in sys.path:
     sys.path.insert(0, tekton_root)
 
-# Import Hermes registration utility with correct path
+# Import shared utilities
 from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
-from tekton.utils.port_config import get_metis_port
+from shared.utils.logging_setup import setup_component_logging
+from shared.utils.env_config import get_component_config
+from shared.utils.errors import StartupError
+from shared.utils.startup import component_startup, StartupMetrics
+from shared.utils.shutdown import GracefulShutdown
 
 from metis.config import config
 from metis.api.routes import router as api_router
 from metis.api.routes import task_manager  # Reuse the TaskManager instance from routes
 from metis.api.schemas import WebSocketMessage, WebSocketRegistration
 from metis.api.fastmcp_endpoints import mcp_router, fastmcp_server
+
+# Set up logging
+logger = setup_component_logging("metis")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for Metis"""
+    # Startup
+    logger.info("Starting Metis API...")
+    
+    # Initialize FastMCP server
+    try:
+        # FastMCP server doesn't need explicit startup - it's just a registry
+        logger.info(f"FastMCP server initialized: {fastmcp_server.name} v{fastmcp_server.version}")
+    except Exception as e:
+        logger.warning(f"FastMCP server initialization failed: {e}")
+    
+    # Get configuration
+    config = get_component_config()
+    port = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT", 8011))
+    
+    # Register with Hermes
+    hermes_registration = HermesRegistration()
+    await hermes_registration.register_component(
+        component_name="metis",
+        port=port,
+        version="0.1.0",
+        capabilities=[
+            "task_management",
+            "dependency_management", 
+            "task_tracking",
+            "websocket_updates"
+        ],
+        metadata={
+            "description": "Task breakdown and management",
+            "category": "planning"
+        }
+    )
+    app.state.hermes_registration = hermes_registration
+    
+    # Start heartbeat task
+    if hermes_registration.is_registered:
+        heartbeat_task = asyncio.create_task(heartbeat_loop(hermes_registration, "metis"))
+    
+    logger.info(f"Metis API started on port {port}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Metis API...")
+    
+    # Cancel heartbeat task if running
+    if hermes_registration.is_registered and 'heartbeat_task' in locals():
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+    
+    # FastMCP server doesn't need explicit shutdown - it's just a registry
+    logger.info("FastMCP server cleanup complete")
+    
+    # Deregister from Hermes
+    if hasattr(app.state, "hermes_registration") and app.state.hermes_registration:
+        await app.state.hermes_registration.deregister("metis")
+    
+    # Give sockets time to close on macOS
+    await asyncio.sleep(0.5)
+    
+    logger.info("Metis API shutdown complete")
 
 
 # Create FastAPI application
@@ -40,6 +116,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -51,8 +128,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Get port from environment variable or use default
-PORT = int(os.environ.get("METIS_PORT", 8011))
+# Get port configuration
+config = get_component_config()
+PORT = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT", 8011))
 
 # Include API routers
 app.include_router(api_router)
@@ -75,13 +153,11 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint following Tekton standards."""
-    port = get_metis_port()
-    
     return {
         "status": "healthy",
         "component": "metis",
         "version": "0.1.0",
-        "port": port,
+        "port": PORT,
         "message": "Metis is running normally"
     }
 
@@ -262,66 +338,6 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(client_id)
 
 
-# Register with Hermes on startup
-@app.on_event("startup")
-async def startup_event():
-    """Startup event handler for Metis API.
-    
-    Initializes FastMCP server and registers the service with Hermes for service discovery.
-    """
-    # Initialize FastMCP server
-    try:
-        await fastmcp_server.startup()
-        print("FastMCP server initialized successfully")
-    except Exception as e:
-        print(f"Warning: FastMCP server initialization failed: {e}")
-    
-    # Register with Hermes using standard utility
-    port = get_metis_port()
-    
-    hermes_registration = HermesRegistration()
-    await hermes_registration.register_component(
-        component_name="metis",
-        port=port,
-        version="0.1.0",
-        capabilities=[
-            "task_management",
-            "dependency_management", 
-            "task_tracking",
-            "websocket_updates"
-        ],
-        metadata={
-            "description": "Task breakdown and management",
-            "category": "planning"
-        }
-    )
-    app.state.hermes_registration = hermes_registration
-    
-    # Start heartbeat task
-    if hermes_registration.is_registered:
-        asyncio.create_task(heartbeat_loop(hermes_registration, "metis"))
-    
-    print(f"Metis API starting on port {port}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Shutdown event handler for Metis API.
-    
-    Shuts down FastMCP server and unregisters the service from Hermes.
-    """
-    # Shutdown FastMCP server
-    try:
-        await fastmcp_server.shutdown()
-        print("FastMCP server shut down successfully")
-    except Exception as e:
-        print(f"Warning: FastMCP server shutdown failed: {e}")
-    
-    # Deregister from Hermes
-    if hasattr(app.state, "hermes_registration") and app.state.hermes_registration:
-        await app.state.hermes_registration.deregister("metis")
-    
-    print("Metis API shutting down")
 
 
 # Custom exception handler for HTTPException
