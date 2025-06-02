@@ -366,3 +366,12 @@ async def global_exception_handler(request, exc):
             "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR
         }
     )
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    
+    # Get port from environment variable or use default
+    port = int(os.environ.get("METIS_PORT", "8011"))
+    
+    uvicorn.run(app, host="0.0.0.0", port=port)
