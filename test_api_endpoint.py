@@ -14,7 +14,7 @@ from metis.models.enums import TaskStatus, Priority
 from metis.core.mcp.tools import get_task_manager
 
 # Configuration
-METIS_PORT = os.environ.get("METIS_PORT", "8011")
+METIS_PORT = os.environ.get("METIS_PORT")
 BASE_URL = f"http://localhost:{METIS_PORT}/api/v1"
 
 def test_api_endpoint():
@@ -119,7 +119,7 @@ def test_api_endpoint():
 
 if __name__ == "__main__":
     # Note: This requires Metis to be running
-    print("Note: This test requires Metis to be running on port 8011")
+    print(f"Note: This test requires Metis to be running on port {METIS_PORT}")
     print("Start Metis with: cd /Users/cskoons/projects/github/Tekton/Metis && ./run_metis.sh")
     print()
     

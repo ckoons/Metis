@@ -6,12 +6,13 @@ components, primarily Telos.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import Field
 from uuid import uuid4
 from typing import Optional, List, Dict, Any
+from tekton.models.base import TektonBaseModel
 
 
-class RequirementRef(BaseModel):
+class RequirementRef(TektonBaseModel):
     """
     Reference to a requirement from another system (e.g., Telos).
     
@@ -43,7 +44,7 @@ class RequirementRef(BaseModel):
         self.updated_at = datetime.utcnow()
 
 
-class RequirementSyncStatus(BaseModel):
+class RequirementSyncStatus(TektonBaseModel):
     """
     Status of requirement synchronization with external systems.
     

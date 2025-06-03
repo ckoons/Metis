@@ -6,9 +6,10 @@ Dependencies represent relationships between tasks that constrain their executio
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import Field
 from uuid import uuid4
 from typing import Optional, List, Dict, Any, Set
+from tekton.models.base import TektonBaseModel
 
 
 class DependencyType(str):
@@ -18,7 +19,7 @@ class DependencyType(str):
     RELATED_TO = "related_to"  # Tasks are related but not blocking
 
 
-class Dependency(BaseModel):
+class Dependency(TektonBaseModel):
     """
     Model representing a dependency between two tasks.
     

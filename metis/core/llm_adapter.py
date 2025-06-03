@@ -46,7 +46,7 @@ class MetisLLMAdapter:
             adapter_url: URL for the LLM adapter service (defaults to Rhetor port)
         """
         # Load client settings from environment
-        rhetor_port = get_env("RHETOR_PORT", "8003")
+        rhetor_port = get_env("RHETOR_PORT")
         default_adapter_url = f"http://localhost:{rhetor_port}"
         
         self.adapter_url = adapter_url or get_env("LLM_ADAPTER_URL", default_adapter_url)

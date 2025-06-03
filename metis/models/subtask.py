@@ -6,15 +6,16 @@ Subtasks are smaller units of work within a parent task.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import Field
 from uuid import uuid4
 from typing import Optional, List, Dict, Any
+from tekton.models.base import TektonBaseModel
 
 from metis.models.enums import TaskStatus
 from metis.models.complexity import ComplexityScore
 
 
-class Subtask(BaseModel):
+class Subtask(TektonBaseModel):
     """
     Subtask model representing a smaller unit of work within a parent task.
     
@@ -55,7 +56,7 @@ class Subtask(BaseModel):
         self.updated_at = datetime.utcnow()
 
 
-class SubtaskTemplate(BaseModel):
+class SubtaskTemplate(TektonBaseModel):
     """
     Template for creating a set of related subtasks.
     

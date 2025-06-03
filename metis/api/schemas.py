@@ -6,22 +6,23 @@ These schemas are based on the core data models but adapted for API usage.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
+from tekton.models.base import TektonBaseModel
 
 from metis.models.enums import TaskStatus, Priority, ComplexityLevel
 
 
 # Base schema for API responses
-class ApiResponse(BaseModel):
+class ApiResponse(TektonBaseModel):
     """Base model for API responses with standard fields."""
     success: bool = True
     message: Optional[str] = None
 
 
 # Subtask schemas
-class SubtaskCreate(BaseModel):
+class SubtaskCreate(TektonBaseModel):
     """Schema for creating a new subtask."""
     title: str
     description: Optional[str] = None
@@ -29,7 +30,7 @@ class SubtaskCreate(BaseModel):
     order: int = 0
 
 
-class SubtaskUpdate(BaseModel):
+class SubtaskUpdate(TektonBaseModel):
     """Schema for updating a subtask."""
     title: Optional[str] = None
     description: Optional[str] = None
@@ -37,7 +38,7 @@ class SubtaskUpdate(BaseModel):
     order: Optional[int] = None
 
 
-class SubtaskResponse(BaseModel):
+class SubtaskResponse(TektonBaseModel):
     """Schema for subtask response."""
     id: str
     title: str
@@ -49,7 +50,7 @@ class SubtaskResponse(BaseModel):
 
 
 # Complexity schemas
-class ComplexityFactorCreate(BaseModel):
+class ComplexityFactorCreate(TektonBaseModel):
     """Schema for creating a complexity factor."""
     name: str
     description: str
@@ -58,7 +59,7 @@ class ComplexityFactorCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class ComplexityFactorUpdate(BaseModel):
+class ComplexityFactorUpdate(TektonBaseModel):
     """Schema for updating a complexity factor."""
     name: Optional[str] = None
     description: Optional[str] = None
@@ -67,7 +68,7 @@ class ComplexityFactorUpdate(BaseModel):
     notes: Optional[str] = None
 
 
-class ComplexityFactorResponse(BaseModel):
+class ComplexityFactorResponse(TektonBaseModel):
     """Schema for complexity factor response."""
     id: str
     name: str
@@ -77,7 +78,7 @@ class ComplexityFactorResponse(BaseModel):
     notes: Optional[str] = None
 
 
-class ComplexityScoreResponse(BaseModel):
+class ComplexityScoreResponse(TektonBaseModel):
     """Schema for complexity score response."""
     id: str
     factors: List[ComplexityFactorResponse] = []
@@ -88,7 +89,7 @@ class ComplexityScoreResponse(BaseModel):
 
 
 # Requirement reference schemas
-class RequirementRefCreate(BaseModel):
+class RequirementRefCreate(TektonBaseModel):
     """Schema for creating a requirement reference."""
     requirement_id: str
     source: str = "telos"
@@ -98,7 +99,7 @@ class RequirementRefCreate(BaseModel):
     description: Optional[str] = None
 
 
-class RequirementRefUpdate(BaseModel):
+class RequirementRefUpdate(TektonBaseModel):
     """Schema for updating a requirement reference."""
     requirement_id: Optional[str] = None
     source: Optional[str] = None
@@ -108,7 +109,7 @@ class RequirementRefUpdate(BaseModel):
     description: Optional[str] = None
 
 
-class RequirementRefResponse(BaseModel):
+class RequirementRefResponse(TektonBaseModel):
     """Schema for requirement reference response."""
     id: str
     requirement_id: str
@@ -122,7 +123,7 @@ class RequirementRefResponse(BaseModel):
 
 
 # Dependency schemas
-class DependencyCreate(BaseModel):
+class DependencyCreate(TektonBaseModel):
     """Schema for creating a dependency between tasks."""
     source_task_id: str
     target_task_id: str
@@ -130,13 +131,13 @@ class DependencyCreate(BaseModel):
     description: Optional[str] = None
 
 
-class DependencyUpdate(BaseModel):
+class DependencyUpdate(TektonBaseModel):
     """Schema for updating a dependency."""
     dependency_type: Optional[str] = None
     description: Optional[str] = None
 
 
-class DependencyResponse(BaseModel):
+class DependencyResponse(TektonBaseModel):
     """Schema for dependency response."""
     id: str
     source_task_id: str
@@ -148,7 +149,7 @@ class DependencyResponse(BaseModel):
 
 
 # Task schemas
-class TaskCreate(BaseModel):
+class TaskCreate(TektonBaseModel):
     """Schema for creating a new task."""
     title: str
     description: str
@@ -180,7 +181,7 @@ class TaskCreate(BaseModel):
         return v
 
 
-class TaskUpdate(BaseModel):
+class TaskUpdate(TektonBaseModel):
     """Schema for updating a task."""
     title: Optional[str] = None
     description: Optional[str] = None
@@ -209,7 +210,7 @@ class TaskUpdate(BaseModel):
         return v
 
 
-class TaskResponse(BaseModel):
+class TaskResponse(TektonBaseModel):
     """Schema for task response."""
     id: str
     title: str
@@ -249,7 +250,7 @@ class DependencyListResponse(ApiResponse):
 
 
 # Query parameters
-class TaskQueryParams(BaseModel):
+class TaskQueryParams(TektonBaseModel):
     """Query parameters for filtering tasks."""
     status: Optional[str] = None
     priority: Optional[str] = None
@@ -261,13 +262,13 @@ class TaskQueryParams(BaseModel):
 
 
 # WebSocket message schemas
-class WebSocketMessage(BaseModel):
+class WebSocketMessage(TektonBaseModel):
     """Base schema for WebSocket messages."""
     type: str
     data: Dict[str, Any]
 
 
-class WebSocketRegistration(BaseModel):
+class WebSocketRegistration(TektonBaseModel):
     """Schema for WebSocket registration messages."""
     client_id: str = Field(default_factory=lambda: str(uuid4()))
     subscribe_to: List[str] = ["task_created", "task_updated", "task_deleted"]

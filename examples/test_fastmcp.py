@@ -14,7 +14,9 @@ from typing import Dict, Any, List
 
 
 # Configuration
-METIS_BASE_URL = "http://localhost:8011"
+import os
+METIS_PORT = os.environ.get("METIS_PORT")
+METIS_BASE_URL = f"http://localhost:{METIS_PORT}"
 MCP_BASE_URL = f"{METIS_BASE_URL}/api/mcp/v2"
 
 

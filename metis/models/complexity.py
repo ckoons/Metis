@@ -6,14 +6,15 @@ It provides structures for evaluating and representing task complexity.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import Field
 from uuid import uuid4
 from typing import Optional, List, Dict, Any
+from tekton.models.base import TektonBaseModel
 
 from metis.models.enums import ComplexityLevel
 
 
-class ComplexityFactor(BaseModel):
+class ComplexityFactor(TektonBaseModel):
     """
     A single factor contributing to task complexity.
     
@@ -37,7 +38,7 @@ class ComplexityFactor(BaseModel):
         return self.score * self.weight
 
 
-class ComplexityScore(BaseModel):
+class ComplexityScore(TektonBaseModel):
     """
     Overall complexity score for a task.
     
@@ -132,7 +133,7 @@ class ComplexityScore(BaseModel):
         self.updated_at = datetime.utcnow()
 
 
-class ComplexityTemplate(BaseModel):
+class ComplexityTemplate(TektonBaseModel):
     """
     Template for predefined complexity factors.
     
@@ -153,7 +154,7 @@ class ComplexityTemplate(BaseModel):
             ComplexityScore: New complexity score with factors from this template
         """
         # Create a copy of the factors to avoid reference issues
-        factor_copies = [ComplexityFactor(**factor.dict()) for factor in self.factors]
+        factor_copies = [ComplexityFactor(**factor.model_dump()) for factor in self.factors]
         
         # Create a new complexity score with these factors
         score = ComplexityScore(factors=factor_copies)

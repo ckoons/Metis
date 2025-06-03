@@ -5,9 +5,10 @@ This module defines the core Task model for the Metis system.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 from uuid import uuid4
 from typing import Optional, List, Dict, Any, Set
+from tekton.models.base import TektonBaseModel
 
 from metis.models.enums import TaskStatus, Priority
 from metis.models.complexity import ComplexityScore
@@ -15,7 +16,7 @@ from metis.models.subtask import Subtask
 from metis.models.requirement import RequirementRef
 
 
-class Task(BaseModel):
+class Task(TektonBaseModel):
     """
     Core Task model for Metis.
     

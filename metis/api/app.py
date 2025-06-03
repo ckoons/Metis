@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from tekton.models.base import TektonBaseModel
 from typing import Dict, List, Set, Any, Optional
 from uuid import UUID
 
@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
     
     # Get configuration
     config = get_component_config()
-    port = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT", 8011))
+    port = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
     
     # Register with Hermes
     hermes_registration = HermesRegistration()
@@ -130,7 +130,7 @@ app.add_middleware(
 
 # Get port configuration
 config = get_component_config()
-PORT = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT", 8011))
+PORT = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
 
 # Include API routers
 app.include_router(api_router)
@@ -372,6 +372,6 @@ if __name__ == "__main__":
     import os
     
     # Get port from environment variable or use default
-    port = int(os.environ.get("METIS_PORT", "8011"))
+    port = int(os.environ.get("METIS_PORT"))
     
     uvicorn.run(app, host="0.0.0.0", port=port)
