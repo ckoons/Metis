@@ -45,7 +45,7 @@ fi
 
 # Start the Metis service
 echo -e "${YELLOW}Starting Metis API server on port $METIS_PORT...${RESET}"
-python -m metis.api.app > "$HOME/.tekton/logs/metis.log" 2>&1 &
+python -m metis > "$HOME/.tekton/logs/metis.log" 2>&1 &
 METIS_PID=$!
 
 # Trap signals for graceful shutdown

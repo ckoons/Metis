@@ -1,30 +1,9 @@
-"""
-Entry point for Metis
-
-This module serves as the entry point for running Metis as a standalone application.
-It starts the API server using uvicorn.
-"""
-
-import os
-import sys
+"""Entry point for python -m metis"""
+from metis.api.app import app
 import uvicorn
-from metis.config import config
-
-def main():
-    """
-    Main entry point for running Metis.
-    
-    Starts the API server using uvicorn.
-    """
-    print(f"Starting Metis API on port {config['METIS_PORT']}...")
-    
-    # Start the API server
-    uvicorn.run(
-        "metis.api.app:app", 
-        host="0.0.0.0", 
-        port=config["METIS_PORT"],
-        reload=True
-    )
+import os
 
 if __name__ == "__main__":
-    main()
+    # Port must be set via environment variable
+    port = int(os.environ.get("METIS_PORT"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
