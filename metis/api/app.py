@@ -368,10 +368,11 @@ async def global_exception_handler(request, exc):
     )
 
 if __name__ == "__main__":
-    import uvicorn
-    import os
+    from shared.utils.socket_server import run_component_server
     
-    # Get port from environment variable or use default
-    port = int(os.environ.get("METIS_PORT"))
-    
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    run_component_server(
+        component_name="metis",
+        app_module="metis.api.app",
+        default_port=int(os.environ.get("METIS_PORT")),
+        reload=False
+    )
