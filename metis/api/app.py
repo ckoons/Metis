@@ -10,6 +10,7 @@ import os
 import sys
 import json
 import asyncio
+import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,11 @@ from shared.utils.errors import StartupError
 from shared.utils.startup import component_startup, StartupMetrics
 from shared.utils.shutdown import GracefulShutdown
 
+# Import shared API utilities
+from shared.api.documentation import get_openapi_configuration
+from shared.api.endpoints import create_ready_endpoint, create_discovery_endpoint, EndpointInfo
+from shared.api.routers import create_standard_routers, mount_standard_routers
+
 from metis.config import config
 from metis.api.routes import router as api_router
 from metis.api.routes import task_manager  # Reuse the TaskManager instance from routes
@@ -39,6 +45,14 @@ from metis.api.fastmcp_endpoints import mcp_router, fastmcp_server
 
 # Set up logging
 logger = setup_component_logging("metis")
+
+# Component configuration
+COMPONENT_NAME = "metis"
+COMPONENT_VERSION = "0.1.0"
+COMPONENT_DESCRIPTION = "Task breakdown and management service for Tekton ecosystem"
+
+# Global start time for readiness checks
+start_time = time.time()
 
 
 @asynccontextmanager
@@ -61,9 +75,9 @@ async def lifespan(app: FastAPI):
     # Register with Hermes
     hermes_registration = HermesRegistration()
     await hermes_registration.register_component(
-        component_name="metis",
+        component_name=COMPONENT_NAME,
         port=port,
-        version="0.1.0",
+        version=COMPONENT_VERSION,
         capabilities=[
             "task_management",
             "dependency_management", 
@@ -71,7 +85,7 @@ async def lifespan(app: FastAPI):
             "websocket_updates"
         ],
         metadata={
-            "description": "Task breakdown and management",
+            "description": COMPONENT_DESCRIPTION,
             "category": "planning"
         }
     )
@@ -109,13 +123,13 @@ async def lifespan(app: FastAPI):
     logger.info("Metis API shutdown complete")
 
 
-# Create FastAPI application
+# Create FastAPI application with OpenAPI configuration
 app = FastAPI(
-    title="Metis API",
-    description="Task Management System for Tekton",
-    version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    **get_openapi_configuration(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        component_description=COMPONENT_DESCRIPTION
+    ),
     lifespan=lifespan
 )
 
@@ -132,9 +146,60 @@ app.add_middleware(
 config = get_component_config()
 PORT = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
 
-# Include API routers
+# Create standard routers
+routers = create_standard_routers(COMPONENT_NAME)
+
+# Add infrastructure endpoints
+@routers.root.get("/ready")
+async def ready():
+    """Readiness check endpoint."""
+    ready_check = create_ready_endpoint(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        start_time=start_time,
+        readiness_check=lambda: task_manager is not None
+    )
+    return await ready_check()
+
+
+@routers.root.get("/discovery")
+async def discovery():
+    """Service discovery endpoint."""
+    discovery_check = create_discovery_endpoint(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        component_description=COMPONENT_DESCRIPTION,
+        endpoints=[
+            EndpointInfo(path="/health", method="GET", description="Health check"),
+            EndpointInfo(path="/ready", method="GET", description="Readiness check"),
+            EndpointInfo(path="/discovery", method="GET", description="Service discovery"),
+            EndpointInfo(path="/api/v1/tasks", method="GET", description="List tasks"),
+            EndpointInfo(path="/api/v1/tasks", method="POST", description="Create task"),
+            EndpointInfo(path="/api/v1/tasks/{id}", method="GET", description="Get task"),
+            EndpointInfo(path="/api/v1/tasks/{id}", method="PUT", description="Update task"),
+            EndpointInfo(path="/api/v1/tasks/{id}", method="DELETE", description="Delete task"),
+            EndpointInfo(path="/api/v1/mcp", method="*", description="MCP endpoints"),
+            EndpointInfo(path="/ws", method="WS", description="WebSocket for real-time updates")
+        ],
+        capabilities=[
+            "task_management",
+            "dependency_management",
+            "task_tracking",
+            "websocket_updates"
+        ],
+        metadata={
+            "category": "planning",
+            "task_statuses": ["pending", "in_progress", "completed", "failed", "cancelled"]
+        }
+    )
+    return await discovery_check()
+
+# Mount standard routers
+mount_standard_routers(app, routers)
+
+# Include business logic routers (api_router already has /api/v1 prefix)
 app.include_router(api_router)
-app.include_router(mcp_router)
+app.include_router(mcp_router, prefix="/api/v1/mcp", tags=["MCP"])
 
 
 # Root endpoint
