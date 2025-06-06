@@ -68,6 +68,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"FastMCP server initialization failed: {e}")
     
+    # Initialize Hermes MCP Bridge
+    try:
+        from metis.core.mcp.hermes_bridge import MetisMCPBridge
+        mcp_bridge = MetisMCPBridge(task_manager)
+        await mcp_bridge.initialize()
+        app.state.mcp_bridge = mcp_bridge
+        logger.info("Hermes MCP Bridge initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Hermes MCP Bridge: {e}")
+    
     # Get configuration
     config = get_component_config()
     port = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
@@ -112,6 +122,11 @@ async def lifespan(app: FastAPI):
     
     # FastMCP server doesn't need explicit shutdown - it's just a registry
     logger.info("FastMCP server cleanup complete")
+    
+    # Shutdown Hermes MCP Bridge
+    if hasattr(app.state, "mcp_bridge") and app.state.mcp_bridge:
+        await app.state.mcp_bridge.shutdown()
+        logger.info("Hermes MCP Bridge shutdown complete")
     
     # Deregister from Hermes
     if hasattr(app.state, "hermes_registration") and app.state.hermes_registration:
