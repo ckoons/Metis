@@ -31,7 +31,8 @@ source "$TEKTON_ROOT/shared/utils/setup_env.sh"
 setup_tekton_env "$SCRIPT_DIR" "$TEKTON_ROOT"
 
 # Create log directories
-mkdir -p "$HOME/.tekton/logs"
+LOG_DIR="${TEKTON_LOG_DIR:-$TEKTON_ROOT/.tekton/logs}"
+mkdir -p "$LOG_DIR"
 
 # Check if virtual environment exists
 if [ -d "venv" ]; then
@@ -46,7 +47,7 @@ fi
 
 # Start the Metis service
 echo -e "${YELLOW}Starting Metis API server on port $METIS_PORT...${RESET}"
-python -m metis > "$HOME/.tekton/logs/metis.log" 2>&1 &
+python -m metis > "$LOG_DIR/metis.log" 2>&1 &
 METIS_PID=$!
 
 # Trap signals for graceful shutdown
@@ -69,7 +70,7 @@ for i in {1..30}; do
     if ! kill -0 $METIS_PID 2>/dev/null; then
         echo -e "${RED}Metis process terminated unexpectedly${RESET}"
         echo -e "${RED}Last 20 lines of log:${RESET}"
-        tail -20 "$HOME/.tekton/logs/metis.log"
+        tail -20 "$LOG_DIR/metis.log"
         exit 1
     fi
     
