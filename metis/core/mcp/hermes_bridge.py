@@ -128,7 +128,7 @@ class MetisMCPBridge(MCPService):
             logger.warning("Hermes client not initialized")
             return
             
-        tool_name = f"{self.component_name}.{tool.name}"
+        tool_name = f"{self.component_name}_{tool.name}"
         
         try:
             await self.hermes_client.register_tool(
