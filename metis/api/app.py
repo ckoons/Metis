@@ -450,9 +450,12 @@ async def global_exception_handler(request, exc):
 if __name__ == "__main__":
     from shared.utils.socket_server import run_component_server
     
+    config = get_component_config()
+    port = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
+    
     run_component_server(
         component_name="metis",
         app_module="metis.api.app",
-        default_port=int(os.environ.get("METIS_PORT")),
+        default_port=port,
         reload=False
     )
