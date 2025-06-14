@@ -25,127 +25,49 @@ if tekton_root not in sys.path:
     sys.path.insert(0, tekton_root)
 
 # Import shared utilities
-from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
+from shared.utils.global_config import GlobalConfig
 from shared.utils.logging_setup import setup_component_logging
-from shared.utils.env_config import get_component_config
-from shared.utils.errors import StartupError
-from shared.utils.startup import component_startup, StartupMetrics
-from shared.utils.shutdown import GracefulShutdown
 
 # Import shared API utilities
 from shared.api.documentation import get_openapi_configuration
 from shared.api.endpoints import create_ready_endpoint, create_discovery_endpoint, EndpointInfo
 from shared.api.routers import create_standard_routers, mount_standard_routers
 
-from metis.config import config
+# Import Metis component
+from metis.core.metis_component import MetisComponent
 from metis.api.routes import router as api_router
-from metis.api.routes import task_manager  # Reuse the TaskManager instance from routes
 from metis.api.schemas import WebSocketMessage, WebSocketRegistration
-from metis.api.fastmcp_endpoints import mcp_router, fastmcp_server
+from metis.api.fastmcp_endpoints import mcp_router
 
 # Set up logging
 logger = setup_component_logging("metis")
 
-# Component configuration
-COMPONENT_NAME = "metis"
-COMPONENT_VERSION = "0.1.0"
-COMPONENT_DESCRIPTION = "Task breakdown and management service for Tekton ecosystem"
 
-# Global start time for readiness checks
-start_time = time.time()
+# Create component instance (singleton) 
+component = MetisComponent()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for Metis"""
-    # Startup
-    logger.info("Starting Metis API...")
-    
-    # Initialize FastMCP server
-    try:
-        # FastMCP server doesn't need explicit startup - it's just a registry
-        logger.info(f"FastMCP server initialized: {fastmcp_server.name} v{fastmcp_server.version}")
-    except Exception as e:
-        logger.warning(f"FastMCP server initialization failed: {e}")
-    
-    # Initialize Hermes MCP Bridge
+async def startup_callback():
+    """Initialize component during startup."""
+    # Initialize Hermes MCP Bridge with component's task manager
     try:
         from metis.core.mcp.hermes_bridge import MetisMCPBridge
-        mcp_bridge = MetisMCPBridge(task_manager)
+        mcp_bridge = MetisMCPBridge(component.task_manager)
         await mcp_bridge.initialize()
-        app.state.mcp_bridge = mcp_bridge
+        component.mcp_bridge = mcp_bridge
         logger.info("Hermes MCP Bridge initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize Hermes MCP Bridge: {e}")
-    
-    # Get configuration
-    config = get_component_config()
-    port = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
-    
-    # Register with Hermes
-    hermes_registration = HermesRegistration()
-    await hermes_registration.register_component(
-        component_name=COMPONENT_NAME,
-        port=port,
-        version=COMPONENT_VERSION,
-        capabilities=[
-            "task_management",
-            "dependency_management", 
-            "task_tracking",
-            "websocket_updates"
-        ],
-        metadata={
-            "description": COMPONENT_DESCRIPTION,
-            "category": "planning"
-        }
-    )
-    app.state.hermes_registration = hermes_registration
-    
-    # Start heartbeat task
-    if hermes_registration.is_registered:
-        heartbeat_task = asyncio.create_task(heartbeat_loop(hermes_registration, "metis"))
-    
-    logger.info(f"Metis API started on port {port}")
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down Metis API...")
-    
-    # Cancel heartbeat task if running
-    if hermes_registration.is_registered and 'heartbeat_task' in locals():
-        heartbeat_task.cancel()
-        try:
-            await heartbeat_task
-        except asyncio.CancelledError:
-            pass
-    
-    # FastMCP server doesn't need explicit shutdown - it's just a registry
-    logger.info("FastMCP server cleanup complete")
-    
-    # Shutdown Hermes MCP Bridge
-    if hasattr(app.state, "mcp_bridge") and app.state.mcp_bridge:
-        await app.state.mcp_bridge.shutdown()
-        logger.info("Hermes MCP Bridge shutdown complete")
-    
-    # Deregister from Hermes
-    if hasattr(app.state, "hermes_registration") and app.state.hermes_registration:
-        await app.state.hermes_registration.deregister("metis")
-    
-    # Give sockets time to close on macOS
-    await asyncio.sleep(0.5)
-    
-    logger.info("Metis API shutdown complete")
+        logger.warning(f"Failed to initialize Hermes MCP Bridge: {e}")
 
 
-# Create FastAPI application with OpenAPI configuration
-app = FastAPI(
+# Create FastAPI application using component's create_app
+app = component.create_app(
+    startup_callback=startup_callback,
     **get_openapi_configuration(
-        component_name=COMPONENT_NAME,
-        component_version=COMPONENT_VERSION,
-        component_description=COMPONENT_DESCRIPTION
-    ),
-    lifespan=lifespan
+        component_name=component.component_name,
+        component_version=component.version,
+        component_description=component.get_metadata()["description"]
+    )
 )
 
 # Add CORS middleware
@@ -157,22 +79,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Get port configuration
-config = get_component_config()
-PORT = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
-
 # Create standard routers
-routers = create_standard_routers(COMPONENT_NAME)
+routers = create_standard_routers(component.component_name)
 
 # Add infrastructure endpoints
 @routers.root.get("/ready")
 async def ready():
     """Readiness check endpoint."""
     ready_check = create_ready_endpoint(
-        component_name=COMPONENT_NAME,
-        component_version=COMPONENT_VERSION,
-        start_time=start_time,
-        readiness_check=lambda: task_manager is not None
+        component_name=component.component_name,
+        component_version=component.version,
+        start_time=component.global_config._start_time,
+        readiness_check=lambda: component.task_manager is not None
     )
     return await ready_check()
 
@@ -180,10 +98,13 @@ async def ready():
 @routers.root.get("/discovery")
 async def discovery():
     """Service discovery endpoint."""
+    capabilities = component.get_capabilities()
+    metadata = component.get_metadata()
+    
     discovery_check = create_discovery_endpoint(
-        component_name=COMPONENT_NAME,
-        component_version=COMPONENT_VERSION,
-        component_description=COMPONENT_DESCRIPTION,
+        component_name=component.component_name,
+        component_version=component.version,
+        component_description=metadata["description"],
         endpoints=[
             EndpointInfo(path="/health", method="GET", description="Health check"),
             EndpointInfo(path="/ready", method="GET", description="Readiness check"),
@@ -196,15 +117,11 @@ async def discovery():
             EndpointInfo(path="/api/v1/mcp", method="*", description="MCP endpoints"),
             EndpointInfo(path="/ws", method="WS", description="WebSocket for real-time updates")
         ],
-        capabilities=[
-            "task_management",
-            "dependency_management",
-            "task_tracking",
-            "websocket_updates"
-        ],
+        capabilities=capabilities,
         metadata={
             "category": "planning",
-            "task_statuses": ["pending", "in_progress", "completed", "failed", "cancelled"]
+            "task_statuses": ["pending", "in_progress", "completed", "failed", "cancelled"],
+            **metadata
         }
     )
     return await discovery_check()
@@ -221,10 +138,11 @@ app.include_router(mcp_router, prefix="/api/v1/mcp", tags=["MCP"])
 @app.get("/")
 async def root():
     """Root endpoint for Metis API."""
+    metadata = component.get_metadata()
     return {
-        "name": "Metis",
-        "description": "Task Management System for Tekton",
-        "version": "0.1.0",
+        "name": component.component_name.capitalize(),
+        "description": metadata["description"],
+        "version": component.version,
         "status": "running",
     }
 
@@ -233,109 +151,24 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint following Tekton standards."""
-    return {
-        "status": "healthy",
-        "component": "metis",
-        "version": "0.1.0",
-        "port": PORT,
-        "message": "Metis is running normally"
-    }
-
-
-# WebSocket connection manager
-class ConnectionManager:
-    """Manager for WebSocket connections."""
-    
-    def __init__(self):
-        """Initialize the connection manager."""
-        self.active_connections: Dict[str, WebSocket] = {}
-        self.subscriptions: Dict[str, Set[str]] = {}
-    
-    async def connect(self, websocket: WebSocket, client_id: str) -> None:
-        """
-        Connect a new WebSocket client.
-        
-        Args:
-            websocket: WebSocket connection
-            client_id: Client ID
-        """
-        await websocket.accept()
-        self.active_connections[client_id] = websocket
-        self.subscriptions[client_id] = set()
-    
-    def disconnect(self, client_id: str) -> None:
-        """
-        Disconnect a WebSocket client.
-        
-        Args:
-            client_id: Client ID
-        """
-        self.active_connections.pop(client_id, None)
-        self.subscriptions.pop(client_id, None)
-    
-    def subscribe(self, client_id: str, event_types: List[str]) -> None:
-        """
-        Subscribe a client to event types.
-        
-        Args:
-            client_id: Client ID
-            event_types: List of event types to subscribe to
-        """
-        if client_id in self.subscriptions:
-            self.subscriptions[client_id].update(event_types)
-    
-    def unsubscribe(self, client_id: str, event_types: List[str]) -> None:
-        """
-        Unsubscribe a client from event types.
-        
-        Args:
-            client_id: Client ID
-            event_types: List of event types to unsubscribe from
-        """
-        if client_id in self.subscriptions:
-            for event_type in event_types:
-                self.subscriptions[client_id].discard(event_type)
-    
-    async def broadcast(self, event_type: str, data: Any) -> None:
-        """
-        Broadcast an event to all subscribed clients.
-        
-        Args:
-            event_type: Event type
-            data: Event data
-        """
-        message = {
-            "type": event_type,
-            "data": data
-        }
-        
-        # Convert to JSON once
-        message_json = json.dumps(message)
-        
-        # Send to each subscribed client
-        for client_id, subscriptions in self.subscriptions.items():
-            if event_type in subscriptions:
-                websocket = self.active_connections.get(client_id)
-                if websocket:
-                    try:
-                        await websocket.send_text(message_json)
-                    except Exception:
-                        # If sending fails, disconnect the client
-                        self.disconnect(client_id)
-
-
-# Create connection manager
-manager = ConnectionManager()
+    return component.get_health_status()
 
 
 # WebSocket endpoint
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates."""
-    client_id = str(UUID)  # Generate a random client ID
+    import uuid
+    client_id = str(uuid.uuid4())  # Generate a random client ID
+    
+    # Get component from app state
+    component = websocket.app.state.component
+    if not component or not component.connection_manager:
+        await websocket.close(code=1011, reason="Component not initialized")
+        return
     
     # Accept the connection
-    await manager.connect(websocket, client_id)
+    await component.connection_manager.connect(websocket, client_id)
     
     try:
         # Wait for registration message
@@ -345,28 +178,33 @@ async def websocket_endpoint(websocket: WebSocket):
         # Validate registration
         try:
             registration = WebSocketRegistration(**registration_data)
-            client_id = registration.client_id  # Use client-provided ID if available
+            if registration.client_id:
+                client_id = registration.client_id  # Use client-provided ID if available
             
             # Subscribe to event types
-            manager.subscribe(client_id, registration.subscribe_to)
+            component.connection_manager.subscribe(client_id, registration.subscribe_to)
             
             # Send confirmation
             await websocket.send_json({
                 "type": "registration_success",
                 "data": {
                     "client_id": client_id,
-                    "subscriptions": list(manager.subscriptions[client_id])
+                    "subscriptions": list(component.connection_manager.subscriptions.get(client_id, set()))
                 }
             })
             
             # Register event handlers with task manager
             for event_type in registration.subscribe_to:
-                task_manager.register_event_handler(
-                    event_type,
-                    lambda event_type, data: asyncio.create_task(
-                        manager.broadcast(event_type, data)
+                if hasattr(component.task_manager, 'register_event_handler'):
+                    component.task_manager.register_event_handler(
+                        event_type,
+                        lambda evt_type, data: asyncio.create_task(
+                            component.connection_manager.broadcast({
+                                "event": evt_type,
+                                "data": data
+                            })
+                        )
                     )
-                )
             
             # Keep connection alive and handle messages
             while True:
@@ -383,12 +221,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif message_type == "subscribe":
                     # Subscribe to event types
                     event_types = message_data.get("data", {}).get("event_types", [])
-                    manager.subscribe(client_id, event_types)
+                    component.connection_manager.subscribe(client_id, event_types)
                 
                 elif message_type == "unsubscribe":
                     # Unsubscribe from event types
                     event_types = message_data.get("data", {}).get("event_types", [])
-                    manager.unsubscribe(client_id, event_types)
+                    component.connection_manager.unsubscribe(client_id, event_types)
                 
         except Exception as e:
             # Invalid registration
@@ -402,7 +240,7 @@ async def websocket_endpoint(websocket: WebSocket):
     
     except WebSocketDisconnect:
         # Client disconnected
-        manager.disconnect(client_id)
+        component.connection_manager.disconnect(client_id)
     
     except Exception as e:
         # Other error
@@ -415,7 +253,7 @@ async def websocket_endpoint(websocket: WebSocket):
             })
         except:
             pass
-        manager.disconnect(client_id)
+        component.connection_manager.disconnect(client_id)
 
 
 
@@ -450,8 +288,9 @@ async def global_exception_handler(request, exc):
 if __name__ == "__main__":
     from shared.utils.socket_server import run_component_server
     
-    config = get_component_config()
-    port = config.metis.port if hasattr(config, 'metis') else int(os.environ.get("METIS_PORT"))
+    # Get port from GlobalConfig
+    global_config = GlobalConfig.get_instance()
+    port = global_config.config.metis.port
     
     run_component_server(
         component_name="metis",

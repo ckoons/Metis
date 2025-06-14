@@ -6,10 +6,9 @@ endpoints to controller methods.
 """
 
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, Query, Path, Body, HTTPException, WebSocket, status
+from fastapi import APIRouter, Depends, Query, Path, Body, HTTPException, WebSocket, status, Request
 
 from metis.api.controllers import TaskController
-from metis.core.task_manager import TaskManager
 from metis.api.schemas import (
     TaskCreate, TaskUpdate, TaskResponse, TaskListResponse,
     TaskDetailResponse, DependencyCreate, DependencyUpdate,
@@ -23,17 +22,18 @@ from metis.core.mcp.tools import decompose_task as mcp_decompose_task
 # Create router
 router = APIRouter(prefix="/api/v1")
 
-# Create TaskManager instance (global for now)
-task_manager = TaskManager()
-
-# Create TaskController instance
-task_controller = TaskController(task_manager)
-
 
 # Dependency for getting the controller
-def get_task_controller() -> TaskController:
-    """Get the TaskController instance."""
-    return task_controller
+def get_task_controller(request: Request) -> TaskController:
+    """Get the TaskController instance from the component."""
+    component = request.app.state.component
+    if not component or not component.task_manager:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Component not initialized"
+        )
+    # Create controller with component's task manager
+    return TaskController(component.task_manager)
 
 
 # Task routes
@@ -343,10 +343,11 @@ async def search_telos_requirements(
     status: Optional[str] = Query(None, title="Filter by status"),
     category: Optional[str] = Query(None, title="Filter by category"),
     page: int = Query(1, title="Page number", ge=1),
-    page_size: int = Query(50, title="Page size", ge=1, le=100)
+    page_size: int = Query(50, title="Page size", ge=1, le=100),
+    controller: TaskController = Depends(get_task_controller)
 ):
     """Search for requirements in Telos."""
-    requirements, total = await task_manager.search_telos_requirements(
+    requirements, total = await controller.task_manager.search_telos_requirements(
         query=query,
         status=status,
         category=category,
@@ -372,10 +373,11 @@ async def search_telos_requirements(
     tags=["Telos Integration"]
 )
 async def import_requirement_as_task(
-    requirement_id: str = Path(..., title="The ID of the requirement to import")
+    requirement_id: str = Path(..., title="The ID of the requirement to import"),
+    controller: TaskController = Depends(get_task_controller)
 ):
     """Import a requirement from Telos as a new task."""
-    task = await task_manager.import_requirement_as_task(requirement_id)
+    task = await controller.task_manager.import_requirement_as_task(requirement_id)
     
     if not task:
         raise HTTPException(
@@ -384,8 +386,6 @@ async def import_requirement_as_task(
         )
     
     # Convert to response schema
-    from metis.api.controllers import TaskController
-    controller = TaskController(task_manager)
     return controller._task_to_response(task)
 
 
