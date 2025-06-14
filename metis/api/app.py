@@ -49,6 +49,12 @@ component = MetisComponent()
 
 async def startup_callback():
     """Initialize component during startup."""
+    # Initialize the component (registers with Hermes, etc.)
+    await component.initialize(
+        capabilities=component.get_capabilities(),
+        metadata=component.get_metadata()
+    )
+    
     # Initialize Hermes MCP Bridge with component's task manager
     try:
         from metis.core.mcp.hermes_bridge import MetisMCPBridge
